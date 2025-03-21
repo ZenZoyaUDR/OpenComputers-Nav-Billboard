@@ -598,7 +598,7 @@ local function main()
     local eventType = eventData[1]
     
   
-  elseif eventType == "key_down" then
+  if eventType == "key_down" then
     local _, _, _, code, isAlt = table.unpack(eventData)
     -- Q to quit
     if code == keyboard.keys.q then
