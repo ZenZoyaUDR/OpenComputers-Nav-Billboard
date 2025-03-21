@@ -187,22 +187,13 @@ local function drawTitle()
   local title = config.title
   
   -- Center the title
-  local titleX = math.floor((width - #title*3) / 2)
+  local titleX = math.floor((width - #title) / 2)
   local titleY = config.borderWidth + 3
   
-  -- Draw title in very large text
+  -- Draw title in normal text
   gpu.setBackground(config.backgroundColor)
   gpu.setForeground(config.titleColor)
-  
-  for i = 1, #title do
-    local char = title:sub(i, i)
-    local x = titleX + (i-1)*3
-    for j = 1, 3 do
-      gpu.set(x, titleY, string.rep(char, 3))
-      titleY = titleY + 1
-    end
-    titleY = titleY - 3
-  end
+  gpu.set(titleX, titleY, title)
   
   -- Draw page indicator
   local pageInfo = string.format("Page %d/%d", currentPage, totalPages)
@@ -222,38 +213,29 @@ local function drawCurrentDestinations()
   for i = startIndex, endIndex do
     local dest = config.destinations[i]
     
-    -- Center coordinates
+    -- Calculate vertical positions
     local centerY = math.floor(height / 2)
     
-    -- Draw direction arrow (extra large)
+    -- Draw direction arrow (still using the big character function)
     local arrowY = centerY - 7
     local arrowX = math.floor(width / 2) - 2
     drawBigChar(arrowX, arrowY, dest.direction, config.arrowColor)
     
-    -- Draw destination name (very large)
+    -- Draw destination name (normal text)
     local nameY = centerY
     local name = dest.name
-    local nameX = math.floor((width - #name*2) / 2)
+    local nameX = math.floor((width - #name) / 2)
     
     gpu.setForeground(config.nameColor)
-    for i = 1, #name do
-      local char = name:sub(i, i)
-      local x = nameX + (i-1)*2
-      gpu.set(x, nameY, string.rep(char, 2))
-      gpu.set(x, nameY+1, string.rep(char, 2))
-    end
+    gpu.set(nameX, nameY, name)
     
-    -- Draw distance (large)
+    -- Draw distance (normal text)
     local distanceText = tostring(dest.distance) .. " BLOCKS"
     local distX = math.floor((width - #distanceText) / 2)
     local distY = centerY + 5
     
     gpu.setForeground(config.distanceColor)
-    for i = 1, #distanceText do
-      local char = distanceText:sub(i, i)
-      gpu.set(distX + i - 1, distY, char)
-      gpu.set(distX + i - 1, distY + 1, char)
-    end
+    gpu.set(distX, distY, distanceText)
   end
 end
 
