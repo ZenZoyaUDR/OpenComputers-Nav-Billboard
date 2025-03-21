@@ -1,62 +1,125 @@
--- Railway System Display Configuration
+-- Configuration for Railway Network Display
+-- Save this file as "/home/navboard_config.lua"
 
 return {
-    -- Display settings
-    updateInterval = 10,          -- Update interval in seconds
-    screenWidth = 80,             -- Screen width
-    screenHeight = 30,            -- Screen height
-    
-    -- Color settings (in hex)
-    defaultBackground = 0x000000, -- Black background
-    defaultForeground = 0xFFFFFF, -- White text
-    titleColor = 0x00FF00,        -- Green for title
-    stationColor = 0xFFFF00,      -- Yellow for stations
-    railColor = 0x808080,         -- Gray for railway lines
-    mainStationColor = 0xFF0000,  -- Red for main stations/hubs
-    useColorsIfAvailable = true,  -- Set to false for monochrome displays
-    
-    -- Railway map - ASCII art representation of your railway system
-    -- Modify this to match your server's railway layout
-    railwayMap = {
-      "                            MINECRAFT RAILWAY NETWORK                            ",
-      "                                                                                 ",
-      "              NORTHERN MINES                                                     ",
-      "                   |                                                             ",
-      "                   |                                  EASTERN VILLAGE            ",
-      "                   |                                         |                   ",
-      "                   |                                         |                   ",
-      "    WESTERN      [A]--------[B]------------------------------[C]                 ",
-      "    FOREST--------+          \\                               |                   ",
-      "                              \\                              |                   ",
-      "                               \\                             |                   ",
-      "                                \\                            |                   ",
-      "                                 \\                           |                   ",
-      "                                  \\                          |                   ",
-      "                                   \\                         |                   ",
-      "                                    [D]--------------------[E]                   ",
-      "                                     |                      |                    ",
-      "                                     |                      |                    ",
-      "                                     |                      |                    ",
-      "                                  CENTRAL                   |                    ",
-      "                                  STATION                   |                    ",
-      "                                                            |                    ",
-      "                                                         SOUTHERN                ",
-      "                                                          FARMS                  ",
-      "                                                                                 ",
+  -- Display settings
+  updateInterval = 10,           -- Update interval in seconds
+  defaultBackground = 0x000000,  -- Black background
+  defaultForeground = 0xFFFFFF,  -- White text
+  titleColor = 0x0088FF,         -- Blue for title
+  hubColor = 0xFFFF00,           -- Yellow for hubs
+  pathColor = 0x808080,          -- Gray for paths lines
+  mainHubColor = 0xFF0000,       -- Red for main hubs
+  borderColor = 0x555555,        -- Border color
+  legendBackgroundColor = 0x222222, -- Darker background for legend
+  useColorsIfAvailable = true,   -- Use colors if the GPU supports it
+  windowTitle = "Railway Network",
+  animationChars = {"|", "/", "-", "\\"},
+  stationFontScale = 1.5,        -- Scale station labels for better visibility
+  legendFontScale = 1.2,         -- Scale legend text for better visibility
+  
+  -- Railway map
+  railwayMap = {
+    "                                    MAP                                          ",
+    "                                                                                 ",
+    "                                             Zenkku                              ",
+    "                                    [B]+-----BASE                                ",
+    "                                     |                                           ",
+    "                                     |                                           ",
+    "                                     |                                           ",
+    "                                     |                                           ",
+    "                                     |                                           ",
+    "         MINES                       |              Khy's                        ",
+    "           |                         |       +--------BASE                       ",
+    "           |                         |------[B]                                  ",
+    "           +                         |                                           ",
+    "          [M]-----------------------[A]+-----MAIN HUB                            ",
+    "                                   / | \\                                        ",
+    "                    END           /  |  \\        Opt & Amy                      ",
+    "                    PORTAL----+[A]   |   [B]+-----BASE                           ",
+    "                                     |                                           ",
+    "                                 [F]-|-[B]       hhhzzzsss'                      ",
+    "                  GOLD FARM-------+     +--------BASE                            ",
+    "                                                                                 ",
+    "                                                                                 ",
+    "                                                                                 ",
+    "                                                                                 ",
+  },
+  
+  -- Station definitions - coordinates are based on map layout
+  stations = {
+    { 
+      name = "A", 
+      label = "MAIN STATION",
+      desc = "Central hub connecting all major railway lines",
+      x = 39, 
+      y = 13, 
+      isMain = true 
     },
-    
-    -- Station information
-    -- Each station has: 
-    -- - name: The label shown on the map
-    -- - label: Full name of the station
-    -- - desc: Description or notes about the station
-    -- - x, y: Coordinates on the map (relative to top-left)
-    -- - isMain: true for main hubs, false for regular stations
-    stations = {
-      { name = "A", label = "NORTH HUB", desc = "Connection to Northern Mines and Western Forest", x = 19, y = 7, isMain = true },
-      { name = "B", label = "CENTRAL JUNCTION", desc = "Major transit hub with storage facilities", x = 28, y = 7, isMain = true },
-      { name = "C", label = "EAST STATION", desc = "Gateway to Eastern Village", x = 60, y = 7, isMain = true },
-      { name = "D", label = "SOUTH JUNCTION", desc = "Industrial area transit point", x = 29, y = 15, isMain = false },
-      { name = "E", label = "FARM STATION", desc = "Access to Southern Farms", x = 54, y = 15, isMain = false },
+    { 
+      name = "B", 
+      label = "ZENKKU BASE",
+      desc = "Connection to Zenkku's Base",
+      x = 22, 
+      y = 3, 
+      isMain = false 
     },
-  }
+    { 
+      name = "B", 
+      label = "KHY'S BASE STATION",
+      desc = "Connection to Khy's Base",
+      x = 34, 
+      y = 11, 
+      isMain = false 
+    },
+    { 
+      name = "M", 
+      label = "MINES STATION",
+      desc = "Access to the mining areas",
+      x = 12, 
+      y = 13, 
+      isMain = false 
+    },
+    { 
+      name = "A", 
+      label = "END PORTAL STATION",
+      desc = "Direct access to the End Portal",
+      x = 23, 
+      y = 16, 
+      isMain = false 
+    },
+    { 
+      name = "B", 
+      label = "OPT & AMY'S BASE",
+      desc = "Connection to Opt and Amy's Base",
+      x = 40, 
+      y = 16, 
+      isMain = false 
+    },
+    { 
+      name = "F", 
+      label = "GOLD FARM",
+      desc = "Connection to the Gold Farm",
+      x = 22, 
+      y = 19, 
+      isMain = false 
+    },
+    { 
+      name = "B", 
+      label = "HHHZZZSSS' BASE",
+      desc = "Connection to hhhzzzsss' Base",
+      x = 40, 
+      y = 19, 
+      isMain = false 
+    }
+  },
+  
+  -- Advanced display settings
+  railColor = 0x666666,        -- Color for the railway lines
+  stationColor = 0xFFAA00,     -- Color for regular stations
+  mainStationColor = 0xFF0000, -- Color for main stations/hubs
+  
+  -- Custom button settings
+  buttonActiveBg = 0x444444,   -- Background for active buttons
+  buttonHoverColor = 0xAAAAAA, -- Hover color for buttons
+}
