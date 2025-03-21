@@ -3,7 +3,7 @@
 
 return {
   -- Display settings
-  updateInterval = 10,           -- Update interval in seconds
+  updateInterval = 1,           -- Update interval in seconds
   defaultBackground = 0x000000,  -- Black background
   defaultForeground = 0xFFFFFF,  -- White text
   titleColor = 0x0088FF,         -- Blue for title
@@ -15,8 +15,8 @@ return {
   useColorsIfAvailable = true,   -- Use colors if the GPU supports it
   windowTitle = "Railway Network",
   animationChars = {"|", "/", "-", "\\"},
-  stationFontScale = 1.5,        -- Scale station labels for better visibility
-  legendFontScale = 1.2,         -- Scale legend text for better visibility
+  stationFontScale = 1,        -- Scale station labels for better visibility
+  legendFontScale = 2,         -- Scale legend text for better visibility
   
   -- Railway map
   railwayMap = {
