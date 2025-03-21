@@ -62,25 +62,25 @@ return {
     },
     { 
       name = "B", 
-      label = "KHY'S BASE STATION",
+      label = "KHY'S BASE",
       desc = "Connection to Khy's Base",
-      x = 39, 
+      x = 45, 
       y = 11, 
       isMain = false 
     },
     { 
       name = "M", 
-      label = "MINES STATION",
+      label = "MINES",
       desc = "Access to the mining areas",
       x = 12, 
-      y = 13, 
+      y = 12, 
       isMain = false 
     },
     { 
       name = "A", 
-      label = "END PORTAL STATION",
+      label = "END PORTAL",
       desc = "Direct access to the End Portal",
-      x = 23, 
+      x = 32, 
       y = 16, 
       isMain = false 
     },
@@ -88,7 +88,7 @@ return {
       name = "B", 
       label = "OPT & AMY'S BASE",
       desc = "Connection to Opt and Amy's Base",
-      x = 40, 
+      x = 42, 
       y = 16, 
       isMain = false 
     },
@@ -96,8 +96,8 @@ return {
       name = "F", 
       label = "GOLD FARM",
       desc = "Connection to the Gold Farm",
-      x = 22, 
-      y = 19, 
+      x = 34, 
+      y = 18, 
       isMain = false 
     },
     { 
@@ -105,7 +105,7 @@ return {
       label = "HHHZZZSSS' BASE",
       desc = "Connection to hhhzzzsss' Base",
       x = 40, 
-      y = 19, 
+      y = 18, 
       isMain = false 
     }
   },
