@@ -30,7 +30,14 @@ local config = {
   animationChars = {"|", "/", "-", "\\"},
   scrollSpeed = 3,
   showScrollbarNumbers = true,
-  railwayMap = {" RAILWAY NETWORK "},
+  railwayMap = {
+    "                            RAILWAY NETWORK                            ",
+    "                                                                       ",
+    "    [A]-------[B]------[C]                                             ",
+    "     |         |         |                                             ",
+    "    [D]-------[E]------[F]                                             ",
+    "                                                                       ",
+  },
   stations = {}
 }
 
@@ -48,6 +55,15 @@ local function updateScrollLimits(mapWidth, mapHeight, viewWidth, viewHeight)
   scrollY = math.max(0, math.min(scrollY, maxScrollY))
 end
 
+-- Draw the railway map
+local function drawMap()
+  term.clear()
+  gpu.setForeground(config.railColor)
+  for i = 1, #config.railwayMap do
+    gpu.set(2, i + 1, config.railwayMap[i])
+  end
+end
+
 -- Improved scrolling function
 local function handleScroll(direction, isHorizontal)
   local scrollAmount = direction * config.scrollSpeed
@@ -56,6 +72,7 @@ local function handleScroll(direction, isHorizontal)
   else
     scrollY = math.max(0, math.min(scrollY + scrollAmount, maxScrollY))
   end
+  drawMap()
 end
 
 -- Fix mouse scroll interpretation
@@ -72,10 +89,12 @@ local function handleScrollbarDrag(x, y, windowX, windowY, viewWidth, viewHeight
   if maxScrollY > 0 and x == windowX + viewWidth + 2 then
     local clickRatio = (y - (windowY + 2)) / viewHeight
     scrollY = math.max(0, math.min(math.floor(clickRatio * maxScrollY), maxScrollY))
+    drawMap()
     return true
   elseif maxScrollX > 0 and y == windowY + viewHeight + 2 then
     local clickRatio = (x - (windowX + 2)) / viewWidth
     scrollX = math.max(0, math.min(math.floor(clickRatio * maxScrollX), maxScrollX))
+    drawMap()
     return true
   end
   return false
@@ -83,6 +102,7 @@ end
 
 -- Event handling loop
 local function main()
+  drawMap()
   while true do
     local eventData = {event.pull(config.updateInterval)}
     local eventType = eventData[1]
@@ -90,23 +110,22 @@ local function main()
       local _, _, _, code, isAlt = table.unpack(eventData)
       if code == keyboard.keys.q then break
       elseif code == keyboard.keys.i then showStationInfo()
-      elseif code == keyboard.keys.r then
+      elseif code == keyboard.keys.r then drawMap()
       elseif code == keyboard.keys.up then handleScroll(-1, false)
       elseif code == keyboard.keys.down then handleScroll(1, false)
       elseif code == keyboard.keys.left then handleScroll(-1, true)
       elseif code == keyboard.keys.right then handleScroll(1, true)
       elseif code == keyboard.keys.pageUp then handleScroll(-math.floor(config.screenHeight / 2), false)
       elseif code == keyboard.keys.pageDown then handleScroll(math.floor(config.screenHeight / 2), false)
-      elseif code == keyboard.keys.home then scrollY = 0
-      elseif code == keyboard.keys["end"] then scrollY = maxScrollY
+      elseif code == keyboard.keys.home then scrollY = 0; drawMap()
+      elseif code == keyboard.keys["end"] then scrollY = maxScrollY; drawMap()
       end
     elseif eventType == "scroll" then
       local _, _, _, direction, isAlt = table.unpack(eventData)
       handleMouseScroll(direction, isAlt)
     elseif eventType == "touch" then
       local _, eX, eY = table.unpack(eventData)
-      if handleScrollbarDrag(eX, eY, 1, 1, config.screenWidth, config.screenHeight, #config.railwayMap[1], #config.railwayMap) then
-      end
+      handleScrollbarDrag(eX, eY, 1, 1, config.screenWidth, config.screenHeight, #config.railwayMap[1], #config.railwayMap)
     end
   end
 end
