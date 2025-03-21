@@ -25,6 +25,7 @@ local config = {
   borderColor = 0x555555,       -- Border color
   useColorsIfAvailable = true,  -- Use colors if the GPU supports it
   animationChars = {"|", "/", "-", "\\"},
+  scrollSpeed = 3,              -- Lines/columns to scroll at once
   
   -- Default railway map (will be overridden by config)
   railwayMap = {
@@ -43,7 +44,13 @@ local config = {
 local originalBackground, originalForeground
 local originalWidth, originalHeight
 
--- Function to draw a window box
+-- Scrolling state
+local scrollX = 0
+local scrollY = 0
+local maxScrollX = 0
+local maxScrollY = 0
+
+-- Function to draw a window box with proper Unicode box drawing characters
 local function drawWindow(title, width, height, x, y, bgColor, fgColor, borderColor)
   -- Save current settings
   local oldBg, oldFg = gpu.getBackground(), gpu.getForeground()
@@ -56,20 +63,20 @@ local function drawWindow(title, width, height, x, y, bgColor, fgColor, borderCo
   gpu.fill(x, y, width, height, " ")
   
   -- Draw top border
-  gpu.fill(x, y, width, 1, "─")
-  gpu.set(x, y, "┌")
-  gpu.set(x + width - 1, y, "┐")
+  gpu.fill(x, y, width, 1, "═")
+  gpu.set(x, y, "╔")
+  gpu.set(x + width - 1, y, "╗")
   
   -- Draw sides
   for i = 1, height - 2 do
-    gpu.set(x, y + i, "│")
-    gpu.set(x + width - 1, y + i, "│")
+    gpu.set(x, y + i, "║")
+    gpu.set(x + width - 1, y + i, "║")
   end
   
   -- Draw bottom border
-  gpu.fill(x, y + height - 1, width, 1, "─")
-  gpu.set(x, y + height - 1, "└")
-  gpu.set(x + width - 1, y + height - 1, "┘")
+  gpu.fill(x, y + height - 1, width, 1, "═")
+  gpu.set(x, y + height - 1, "╚")
+  gpu.set(x + width - 1, y + height - 1, "╝")
   
   -- Draw title
   gpu.setForeground(fgColor)
@@ -235,7 +242,7 @@ local function setupUI()
   gpu.setBackground(config.defaultBackground)
   gpu.setForeground(config.defaultForeground)
   term.clear()
-  
+
   return screenWidth, screenHeight
 end
 
@@ -245,6 +252,64 @@ local function restoreUI()
   gpu.setForeground(originalForeground)
   gpu.setResolution(originalWidth, originalHeight)
   term.clear()
+end
+
+-- Calculate max scroll values based on map and window size
+local function updateScrollLimits(mapWidth, mapHeight, windowWidth, windowHeight)
+  -- Account for window borders and padding
+  local viewWidth = windowWidth - 4
+  local viewHeight = windowHeight - 5
+  
+  maxScrollX = math.max(0, mapWidth - viewWidth)
+  maxScrollY = math.max(0, mapHeight - viewHeight)
+  
+  -- Clamp current scroll values
+  scrollX = math.max(0, math.min(scrollX, maxScrollX))
+  scrollY = math.max(0, math.min(scrollY, maxScrollY))
+end
+
+-- Draw scroll indicators if scrolling is available
+local function drawScrollIndicators(windowX, windowY, windowWidth, windowHeight)
+  -- Only draw indicators if scrolling is available
+  if maxScrollX > 0 or maxScrollY > 0 then
+    local oldFg = gpu.getForeground()
+    gpu.setForeground(config.borderColor)
+    
+    -- Draw vertical scroll indicator on right border
+    if maxScrollY > 0 then
+      local scrollBarHeight = windowHeight - 4
+      local scrollHandlePos = math.floor((scrollY / maxScrollY) * (scrollBarHeight - 1)) + windowY + 2
+      local scrollHandleChar = "█"
+      
+      for i = windowY + 2, windowY + windowHeight - 3 do
+        gpu.set(windowX + windowWidth - 1, i, (i == scrollHandlePos) and scrollHandleChar or "│")
+      end
+    end
+    
+    -- Draw horizontal scroll indicator on bottom border
+    if maxScrollX > 0 then
+      local scrollBarWidth = windowWidth - 4
+      local scrollHandlePos = math.floor((scrollX / maxScrollX) * (scrollBarWidth - 1)) + windowX + 2
+      local scrollHandleChar = "▀"
+      
+      for i = windowX + 2, windowX + windowWidth - 3 do
+        gpu.set(i, windowY + windowHeight - 1, (i == scrollHandlePos) and scrollHandleChar or "─")
+      end
+    end
+    
+    gpu.setForeground(oldFg)
+  end
+end
+
+-- Handle scroll event
+local function handleScroll(direction, isHorizontal)
+  local scrollAmount = direction * config.scrollSpeed
+  
+  if isHorizontal then
+    scrollX = math.max(0, math.min(scrollX + scrollAmount, maxScrollX))
+  else
+    scrollY = math.max(0, math.min(scrollY + scrollAmount, maxScrollY))
+  end
 end
 
 -- Draw the railway map within a window
@@ -258,53 +323,87 @@ local function drawMap()
   end
   
   local mapHeight = #config.railwayMap
-  local windowWidth = math.min(mapWidth + 4, screenWidth - 2)
+  local windowWidth = math.min(mapWidth + 8, screenWidth - 2) -- Extra padding for scrollbars
   local windowHeight = math.min(mapHeight + 6, screenHeight - 4)
   local windowX = math.floor((screenWidth - windowWidth) / 2)
   local windowY = 2
   
-  -- Draw the map window
-  drawWindow("MAP", windowWidth, windowHeight, windowX, windowY, 
-             config.defaultBackground, config.titleColor, config.borderColor)
+  -- Update scroll limits
+  updateScrollLimits(mapWidth, mapHeight, windowWidth, windowHeight)
   
-  -- Draw railway map
-  gpu.setForeground(config.railColor)
-  for i, line in ipairs(config.railwayMap) do
-    gpu.set(windowX + 2, windowY + 2 + i, line)
-  end
+  -- Draw scroll indicators
+  drawScrollIndicators(windowX, windowY, windowWidth, windowHeight)
   
-  -- Highlight stations
-  for _, station in ipairs(config.stations) do
-    if config.useColorsIfAvailable then
-      if station.isMain then
-        gpu.setForeground(config.mainStationColor)
-      else
-        gpu.setForeground(config.stationColor)
-      end
+  -- Calculate visible area
+  local viewWidth = windowWidth - 4
+  local viewHeight = windowHeight - 5
+  
+  -- Draw scrolling status if enabled
+  if maxScrollX > 0 or maxScrollY > 0 then
+    local scrollStatus = "Scroll: " .. scrollY .. "/" .. maxScrollY
+    if maxScrollX > 0 then
+      scrollStatus = scrollStatus .. " | H-Scroll: " .. scrollX .. "/" .. maxScrollX
     end
-    gpu.set(windowX + 2 + station.x, windowY + 2 + station.y, station.name)
+    
+    gpu.setForeground(config.borderColor)
+    local statusX = windowX + windowWidth - 2 - #scrollStatus
+    gpu.set(statusX, windowY, scrollStatus)
   end
   
-  -- Draw legend
-  local legendX = windowX + 2
-  local legendY = windowY + windowHeight - 4
-  gpu.setForeground(config.defaultForeground)
-  gpu.set(legendX, legendY, "LEGEND:")
-  
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.mainStationColor)
+  -- Draw railway map with scrolling
+  gpu.setForeground(config.railColor)
+  for i = 1, math.min(viewHeight, mapHeight) do
+    local mapY = i + scrollY
+    if mapY <= mapHeight then
+      local line = config.railwayMap[mapY] or ""
+      local displayLine = line:sub(scrollX + 1, scrollX + viewWidth)
+      gpu.set(windowX + 2, windowY + 2 + i - 1, displayLine)
+    end
   end
-  gpu.set(legendX, legendY + 1, "● Main Stations")
   
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.stationColor)
+  -- Highlight stations that are visible in the current scroll view
+  for _, station in ipairs(config.stations) do
+    local visibleX = station.x - scrollX
+    local visibleY = station.y - scrollY
+    
+    if visibleX >= 0 and visibleX < viewWidth and visibleY >= 0 and visibleY < viewHeight then
+      if config.useColorsIfAvailable then
+        if station.isMain then
+          gpu.setForeground(config.mainStationColor)
+        else
+          gpu.setForeground(config.stationColor)
+        end
+      end
+      gpu.set(windowX + 2 + visibleX, windowY + 2 + visibleY, station.name)
+    end
   end
-  gpu.set(legendX + 20, legendY + 1, "● Regular Stations")
   
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.railColor)
+  -- Draw legend at the bottom of the window if there's room
+  if windowHeight >= 10 then
+    local legendY = windowY + windowHeight - 3
+    gpu.setForeground(config.defaultForeground)
+    gpu.set(windowX + 2, legendY, "LEGEND:")
+    
+    if config.useColorsIfAvailable then
+      gpu.setForeground(config.mainStationColor)
+    end
+    gpu.set(windowX + 2, legendY + 1, "● Main Stations")
+    
+    if config.useColorsIfAvailable then
+      gpu.setForeground(config.stationColor)
+    end
+    gpu.set(windowX + 20, legendY + 1, "● Regular Stations")
+    
+    if config.useColorsIfAvailable then
+      gpu.setForeground(config.railColor)
+    end
+    gpu.set(windowX + 40, legendY + 1, "─── Railway Lines")
   end
-  gpu.set(legendX + 40, legendY + 1, "─── Railway Lines")
+  
+  -- Draw scrolling help
+  local helpY = windowY + 1
+  gpu.setForeground(config.borderColor)
+  gpu.set(windowX + 2, helpY, "Scroll: Mouse Wheel | Horizontal: Alt+Wheel")
   
   -- Draw buttons
   gpu.setForeground(config.defaultForeground)
@@ -419,7 +518,7 @@ local function main()
     local eventType = eventData[1]
     
     if eventType == "key_down" then
-      local _, _, _, code = table.unpack(eventData)
+      local _, _, _, code, isAlt = table.unpack(eventData)
       -- Q to quit
       if code == keyboard.keys.q then
         running = false
@@ -428,6 +527,19 @@ local function main()
         showStationInfo()
       -- R to refresh/redraw
       elseif code == keyboard.keys.r then
+        lastUpdateTime = computer.uptime()
+      -- Arrow keys for scrolling
+      elseif code == keyboard.keys.up then
+        handleScroll(-1, false)
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.down then
+        handleScroll(1, false)
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.left then
+        handleScroll(-1, true)
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.right then
+        handleScroll(1, true)
         lastUpdateTime = computer.uptime()
       end
     elseif eventType == "touch" then
@@ -447,6 +559,10 @@ local function main()
           running = false
         end
       end
+    elseif eventType == "scroll" then
+      local _, _, _, direction, isAlt = table.unpack(eventData)
+      handleScroll(direction, isAlt)
+      lastUpdateTime = computer.uptime()
     end
     
     -- Automatic refresh based on interval
@@ -456,7 +572,7 @@ local function main()
     end
   end
   
-  -- Cleanup
+  -- Cleanup - just restore UI without showing exit message
   restoreUI()
 end
 
