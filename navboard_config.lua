@@ -48,15 +48,15 @@ return {
       name = "A", 
       label = "MAIN STATION",
       desc = "Central hub connecting all major railway lines",
-      x = 38, 
-      y = 14, 
+      x = 37, 
+      y = 13, 
       isMain = true 
     },
     { 
       name = "B", 
       label = "ZENKKU BASE",
       desc = "Connection to Zenkku's Base",
-      x = 28, 
+      x = 37, 
       y = 3, 
       isMain = false 
     },
@@ -64,7 +64,7 @@ return {
       name = "B", 
       label = "KHY'S BASE STATION",
       desc = "Connection to Khy's Base",
-      x = 34, 
+      x = 39, 
       y = 11, 
       isMain = false 
     },
