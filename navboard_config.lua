@@ -1,38 +1,21 @@
--- Navigation Configuration File
+-- Railway System Display Configuration
+-- Save as "navboard_config.lua" for use with the bootstrap updater
 
-{
-  -- Title settings
-  title = "NETHER HUB",
-  
-  -- Color settings (hexadecimal RGB values)
-  rainbowColors = {
-    0xFF0000,  -- Red
-    0xFF7F00,  -- Orange
-    0xFFFF00,  -- Yellow
-    0x00FF00,  -- Green
-    0x0000FF,  -- Blue
-    0x4B0082,  -- Indigo
-    0x9400D3,  -- Violet
-  },
-  backgroundColor = 0x000000,  -- Black
-  titleColor = 0xFF0000,       -- Red
-  arrowColor = 0xFFFF00,       -- Yellow
-  nameColor = 0xFFFFFF,        -- White
-  distanceColor = 0x00FF00,    -- Green
-  pageInfoColor = 0xAAAAAA,    -- Light gray
-  
+return {
   -- Display settings
-  borderWidth = 1,             -- Width of the rainbow border
-  frameDelay = 0.1,            -- Seconds between animation frames
-  slideshowDelay = 1000,          -- Seconds between slideshow pages
-  locationsPerPage = 1,        -- Number of locations to show per page
+  updateInterval = 10,          -- Update interval in seconds
+  screenWidth = 80,             -- Screen width
+  screenHeight = 30,            -- Screen height
   
-  -- List of nether hub destinations
-  destinations = {
-    {name = "Zenkku's Base", direction = "↑", distance = 1800},
-    {name = "Khy's Base", direction = "→", distance = 27},
-    {name = "hhhzzzsss's Base", direction = "↓", distance = 820},
-    {name = "Mine", direction = "←", distance = 500},
-    {name = "End Portal", direction = "↙", distance = 83},
-  }
+  -- Color settings (in hex)
+  defaultBackground = 0x000000, -- Black background
+  defaultForeground = 0xFFFFFF, -- White text
+  titleColor = 0x00FF00,        -- Green for title
+  stationColor = 0xFFFF00,      -- Yellow for stations
+  railColor = 0x808080,         -- Gray for railway lines
+  mainStationColor = 0xFF0000,  -- Red for main stations/hubs
+  useColorsIfAvailable = true,  -- Set to false for monochrome displays
+  
+  -- You can add custom settings below this line
+  -- These will be available in the config table in the main program
 }
