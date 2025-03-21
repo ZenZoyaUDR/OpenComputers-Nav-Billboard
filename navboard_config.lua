@@ -24,7 +24,7 @@ return {
     -- Display settings
     borderWidth = 1,             -- Width of the rainbow border
     frameDelay = 0.1,            -- Seconds between animation frames
-    slideshowDelay = 500,          -- Seconds between slideshow pages
+    slideshowDelay = 3000,          -- Seconds between slideshow pages
     locationsPerPage = 1,        -- Number of locations to show per page
     
     -- List of destinations
