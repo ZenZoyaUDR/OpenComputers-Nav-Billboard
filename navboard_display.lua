@@ -45,293 +45,49 @@ local config = {
   }
 }
 
--- Animation state
-local width, height = gpu.getResolution()
-local borderOffset = 0
-local currentPage = 1
-local totalPages = 1
-local lastSlideChange = os.time()
-
--- Extra large text characters (5x5 grid)
-local bigChars = {
-  ["↑"] = {
-    "  █  ",
-    " ███ ",
-    "█████",
-    "  █  ",
-    "  █  "
-  },
-  ["→"] = {
-    "     ",
-    "  █  ",
-    "█████",
-    "  █  ",
-    "     "
-  },
-  ["↓"] = {
-    "  █  ",
-    "  █  ",
-    "█████",
-    " ███ ",
-    "  █  "
-  },
-  ["←"] = {
-    "     ",
-    "  █  ",
-    "█████",
-    "  █  ",
-    "     "
-  },
-  ["↗"] = {
-    "  ███",
-    "   ██",
-    "  █ █",
-    " █  █",
-    "█    "
-  },
-  ["↙"] = {
-    "█    ",
-    " █  █",
-    "  █ █",
-    "   ██",
-    "  ███"
-  }
-}
-
--- Function to load configuration from file
 -- Function to load configuration from file
 local function loadConfig()
   if not filesystem.exists(configPath) then
-    print("Config file not found, using defaults")
     return
   end
-  
-  print("Loading configuration...")
-  
-  local file = io.open(configPath, "r")
-  if not file then
-    print("Could not open config file")
-    return
-  end
-  
+  local file = filesystem.open(configPath, "r")
   local content = file:read("*all")
   file:close()
-  
-  -- The config file should be a Lua table, so we need to wrap it in return statement if its not already
-  if not content:match("^%s*return%s") then
-    content = "return " .. content
-  end
-  
-  local success, loadedConfig = pcall(load(content))
-  
+  local success, loadedConfig = pcall(function() return load("return " .. content)() end)
   if success and type(loadedConfig) == "table" then
-    -- Update config with loaded values
-    for k, v in pairs(loadedConfig) do
-      config[k] = v
-    end
-    print("Configuration loaded successfully!")
-  else
-    print("Error parsing configuration file: " .. tostring(loadedConfig))
-  end
-  
-  -- Calculate total pages
-  totalPages = math.ceil(#config.destinations / config.locationsPerPage)
-end
-
--- Function to draw big character (for arrows)
-local function drawBigChar(x, y, char, fg)
-  if not bigChars[char] then
-    return -- Skip if character not defined
-  end
-  
-  gpu.setBackground(config.backgroundColor)
-  gpu.setForeground(fg)
-  
-  for i, line in ipairs(bigChars[char]) do
-    for j = 1, #line do
-      local c = line:sub(j, j)
-      if c == "█" then
-        gpu.set(x+j-1, y+i-1, "█")
-      end
-    end
+    config = loadedConfig
   end
 end
 
--- Function to clear screen
-local function clearScreen()
-  gpu.setBackground(config.backgroundColor)
+-- Function to draw a location icon
+local function drawLocationIcon(x, y, direction)
+  gpu.setForeground(config.arrowColor)
+  gpu.set(x, y, direction)
+end
+
+-- Function to display destinations
+local function displayDestinations()
   term.clear()
-end
-
--- Function to draw rainbow border
-local function drawRainbowBorder(offset)
-  local borderWidth = config.borderWidth
-  
-  -- Draw top and bottom borders
-  for x = 1, width do
-    local colorIndex = ((x + offset) % #config.rainbowColors) + 1
-    gpu.setBackground(config.rainbowColors[colorIndex])
-    
-    -- Top border
-    for by = 1, borderWidth do
-      gpu.set(x, by, " ")
-    end
-    
-    -- Bottom border
-    for by = height - borderWidth + 1, height do
-      gpu.set(x, by, " ")
-    end
-  end
-  
-  -- Draw left and right borders
-  for y = borderWidth + 1, height - borderWidth do
-    -- Left border
-    local leftColorIndex = ((y + offset) % #config.rainbowColors) + 1
-    gpu.setBackground(config.rainbowColors[leftColorIndex])
-    for bx = 1, borderWidth do
-      gpu.set(bx, y, " ")
-    end
-    
-    -- Right border
-    local rightColorIndex = ((y + offset) % #config.rainbowColors) + 1
-    gpu.setBackground(config.rainbowColors[rightColorIndex])
-    for bx = width - borderWidth + 1, width do
-      gpu.set(bx, y, " ")
-    end
-  end
-end
-
--- Function to draw the nether hub title
-local function drawTitle()
-  local title = config.title
-  
-  -- Center the title
-  local titleX = math.floor((width - #title*3) / 2)
-  local titleY = config.borderWidth + 3
-  
-  -- Draw title in very large text
-  gpu.setBackground(config.backgroundColor)
-  gpu.setForeground(config.titleColor)
-  
-  for i = 1, #title do
-    local char = title:sub(i, i)
-    local x = titleX + (i-1)*3
-    for j = 1, 3 do
-      gpu.set(x, titleY, string.rep(char, 3))
-      titleY = titleY + 1
-    end
-    titleY = titleY - 3
-  end
-  
-  -- Draw page indicator
-  local pageInfo = string.format("Page %d/%d", currentPage, totalPages)
-  local pageX = width - #pageInfo - 5
-  local pageY = height - 5
-  gpu.setForeground(config.pageInfoColor)
-  gpu.set(pageX, pageY, pageInfo)
-end
-
--- Function to draw destinations for current page
-local function drawCurrentDestinations()
   local startIndex = (currentPage - 1) * config.locationsPerPage + 1
   local endIndex = math.min(startIndex + config.locationsPerPage - 1, #config.destinations)
-  
-  gpu.setBackground(config.backgroundColor)
-  
   for i = startIndex, endIndex do
     local dest = config.destinations[i]
-    
-    -- Center coordinates
-    local centerY = math.floor(height / 2)
-    
-    -- Draw direction arrow (extra large)
-    local arrowY = centerY - 7
-    local arrowX = math.floor(width / 2) - 2
-    drawBigChar(arrowX, arrowY, dest.direction, config.arrowColor)
-    
-    -- Draw destination name (very large)
-    local nameY = centerY
-    local name = dest.name
-    local nameX = math.floor((width - #name*2) / 2)
-    
+    drawLocationIcon(10, i * 3, dest.direction)
     gpu.setForeground(config.nameColor)
-    for i = 1, #name do
-      local char = name:sub(i, i)
-      local x = nameX + (i-1)*2
-      gpu.set(x, nameY, string.rep(char, 2))
-      gpu.set(x, nameY+1, string.rep(char, 2))
-    end
-    
-    -- Draw distance (large)
-    local distanceText = tostring(dest.distance) .. " BLOCKS"
-    local distX = math.floor((width - #distanceText) / 2)
-    local distY = centerY + 5
-    
+    gpu.set(15, i * 3, dest.name)
     gpu.setForeground(config.distanceColor)
-    for i = 1, #distanceText do
-      local char = distanceText:sub(i, i)
-      gpu.set(distX + i - 1, distY, char)
-      gpu.set(distX + i - 1, distY + 1, char)
-    end
+    gpu.set(30, i * 3, tostring(dest.distance) .. " BLOCKS")
   end
 end
 
--- Function to handle animation and slideshow
-local function runAnimation()
-  clearScreen()
-  
-  print("Press Ctrl+C to exit or R to reload configuration")
-  
-  while true do
-    -- Draw animated rainbow border
-    drawRainbowBorder(borderOffset)
-    
-    -- Draw title and current destinations
-    drawTitle()
-    drawCurrentDestinations()
-    
-    -- Update animation
-    borderOffset = (borderOffset + 1) % 100
-    
-    -- Check if it's time to change slides
-    local currentTime = os.time()
-    if currentTime - lastSlideChange >= config.slideshowDelay then
-      currentPage = currentPage % totalPages + 1
-      lastSlideChange = currentTime
-    end
-    
-    -- Wait before next frame
-    os.sleep(config.frameDelay)
-    
-    -- Check for key presses
-    local eventType, _, _, code = event.pull(0)
-    if eventType == "key_down" then
-      if code == 3 then  -- Ctrl+C
-        break
-      elseif code == 19 then  -- R key
-        loadConfig()
-        clearScreen()
-      end
-    end
-  end
-  
-  -- Restore default colors and clear screen
-  gpu.setBackground(0x000000)
-  gpu.setForeground(0xFFFFFF)
-  term.clear()
-end
-
--- Main program
+-- Main loop
 local function main()
-  print("Starting Navigation Billboard by ZenZoya...")
-  
-  -- Load configuration
   loadConfig()
-  
-  -- Start the animation
-  os.sleep(1)
-  runAnimation()
+  while true do
+    displayDestinations()
+    os.sleep(config.slideshowDelay)
+    currentPage = (currentPage % #config.destinations) + 1
+  end
 end
 
--- Run the program
 main()
