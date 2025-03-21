@@ -99,6 +99,7 @@ local bigChars = {
 }
 
 -- Function to load configuration from file
+-- Function to load configuration from file
 local function loadConfig()
   if not filesystem.exists(configPath) then
     print("Config file not found, using defaults")
@@ -107,23 +108,21 @@ local function loadConfig()
   
   print("Loading configuration...")
   
-  local file = filesystem.open(configPath, "r")
+  local file = io.open(configPath, "r")
   if not file then
     print("Could not open config file")
     return
   end
   
-  local content = ""
-  local line = file:read()
-  while line do
-    content = content .. line .. "\n"
-    line = file:read()
-  end
+  local content = file:read("*all")
   file:close()
   
-  local success, loadedConfig = pcall(function()
-    return load("return " .. content)()
-  end)
+  -- The config file should be a Lua table, so we need to wrap it in return statement if its not already
+  if not content:match("^%s*return%s") then
+    content = "return " .. content
+  end
+  
+  local success, loadedConfig = pcall(load(content))
   
   if success and type(loadedConfig) == "table" then
     -- Update config with loaded values
@@ -132,7 +131,7 @@ local function loadConfig()
     end
     print("Configuration loaded successfully!")
   else
-    print("Error parsing configuration file")
+    print("Error parsing configuration file: " .. tostring(loadedConfig))
   end
   
   -- Calculate total pages
