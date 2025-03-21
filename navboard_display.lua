@@ -48,40 +48,15 @@ local config = {
 -- Function to load configuration from file
 local function loadConfig()
   if not filesystem.exists(configPath) then
-    print("Config file not found, using defaults")
     return
   end
-  
-  print("Loading configuration...")
-  
-  local file = io.open(configPath, "r")
-  if not file then
-    print("Could not open config file")
-    return
-  end
-  
+  local file = filesystem.open(configPath, "r")
   local content = file:read("*all")
   file:close()
-  
-  -- The config file should be a Lua table, so we need to wrap it in return statement if it's not already
-  if not content:match("^%s*return%s") then
-    content = "return " .. content
-  end
-  
-  local success, loadedConfig = pcall(load(content))
-  
+  local success, loadedConfig = pcall(function() return load("return " .. content)() end)
   if success and type(loadedConfig) == "table" then
-    -- Update config with loaded values
-    for k, v in pairs(loadedConfig) do
-      config[k] = v
-    end
-    print("Configuration loaded successfully!")
-  else
-    print("Error parsing configuration file: " .. tostring(loadedConfig))
+    config = loadedConfig
   end
-  
-  -- Calculate total pages
-  totalPages = math.ceil(#config.destinations / config.locationsPerPage)
 end
 
 -- Function to draw a location icon
