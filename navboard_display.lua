@@ -25,7 +25,6 @@ local config = {
   borderColor = 0x555555,       -- Border color
   useColorsIfAvailable = true,  -- Use colors if the GPU supports it
   animationChars = {"|", "/", "-", "\\"},
-  scrollSpeed = 3,              -- Lines/columns to scroll at once
   
   -- Default railway map (will be overridden by config)
   railwayMap = {
@@ -45,12 +44,10 @@ local originalBackground, originalForeground
 local originalWidth, originalHeight
 
 -- Scrolling state
-local scrollX = 0
-local scrollY = 0
-local maxScrollX = 0
-local maxScrollY = 0
+local scrollOffset = 0
+local maxScrollOffset = 0
 
--- Function to draw a window box with proper Unicode box drawing characters
+-- Function to draw a window box
 local function drawWindow(title, width, height, x, y, bgColor, fgColor, borderColor)
   -- Save current settings
   local oldBg, oldFg = gpu.getBackground(), gpu.getForeground()
@@ -63,20 +60,20 @@ local function drawWindow(title, width, height, x, y, bgColor, fgColor, borderCo
   gpu.fill(x, y, width, height, " ")
   
   -- Draw top border
-  gpu.fill(x, y, width, 1, "═")
-  gpu.set(x, y, "╔")
-  gpu.set(x + width - 1, y, "╗")
+  gpu.fill(x, y, width, 1, "─")
+  gpu.set(x, y, "┌")
+  gpu.set(x + width - 1, y, "┐")
   
   -- Draw sides
   for i = 1, height - 2 do
-    gpu.set(x, y + i, "║")
-    gpu.set(x + width - 1, y + i, "║")
+    gpu.set(x, y + i, "│")
+    gpu.set(x + width - 1, y + i, "│")
   end
   
   -- Draw bottom border
-  gpu.fill(x, y + height - 1, width, 1, "═")
-  gpu.set(x, y + height - 1, "╚")
-  gpu.set(x + width - 1, y + height - 1, "╝")
+  gpu.fill(x, y + height - 1, width, 1, "─")
+  gpu.set(x, y + height - 1, "└")
+  gpu.set(x + width - 1, y + height - 1, "┘")
   
   -- Draw title
   gpu.setForeground(fgColor)
@@ -242,7 +239,7 @@ local function setupUI()
   gpu.setBackground(config.defaultBackground)
   gpu.setForeground(config.defaultForeground)
   term.clear()
-
+  
   return screenWidth, screenHeight
 end
 
@@ -254,65 +251,52 @@ local function restoreUI()
   term.clear()
 end
 
--- Calculate max scroll values based on map and window size
-local function updateScrollLimits(mapWidth, mapHeight, windowWidth, windowHeight)
-  -- Account for window borders and padding
-  local viewWidth = windowWidth - 4
-  local viewHeight = windowHeight - 5
+-- Draw scrollbar
+local function drawScrollbar(x, y, height, totalItems, visibleItems, currentOffset)
+  if totalItems <= visibleItems then
+    return -- No need for scrollbar
+  end
   
-  maxScrollX = math.max(0, mapWidth - viewWidth)
-  maxScrollY = math.max(0, mapHeight - viewHeight)
+  -- Draw scrollbar track
+  gpu.setForeground(config.borderColor)
+  for i = 0, height - 1 do
+    gpu.set(x, y + i, "│")
+  end
   
-  -- Clamp current scroll values
-  scrollX = math.max(0, math.min(scrollX, maxScrollX))
-  scrollY = math.max(0, math.min(scrollY, maxScrollY))
-end
-
--- Draw scroll indicators if scrolling is available
-local function drawScrollIndicators(windowX, windowY, windowWidth, windowHeight)
-  -- Only draw indicators if scrolling is available
-  if maxScrollX > 0 or maxScrollY > 0 then
-    local oldFg = gpu.getForeground()
-    gpu.setForeground(config.borderColor)
-    
-    -- Draw vertical scroll indicator on right border
-    if maxScrollY > 0 then
-      local scrollBarHeight = windowHeight - 4
-      local scrollHandlePos = math.floor((scrollY / maxScrollY) * (scrollBarHeight - 1)) + windowY + 2
-      local scrollHandleChar = "█"
-      
-      for i = windowY + 2, windowY + windowHeight - 3 do
-        gpu.set(windowX + windowWidth - 1, i, (i == scrollHandlePos) and scrollHandleChar or "│")
-      end
+  -- Calculate thumb position and size
+  local thumbSize = math.max(1, math.floor(height * (visibleItems / totalItems)))
+  local range = totalItems - visibleItems
+  local thumbPos = math.floor((height - thumbSize) * (currentOffset / range))
+  
+  -- Draw scrollbar thumb
+  gpu.setForeground(config.titleColor)
+  for i = 0, thumbSize - 1 do
+    if y + thumbPos + i < y + height then
+      gpu.set(x, y + thumbPos + i, "█")
     end
-    
-    -- Draw horizontal scroll indicator on bottom border
-    if maxScrollX > 0 then
-      local scrollBarWidth = windowWidth - 4
-      local scrollHandlePos = math.floor((scrollX / maxScrollX) * (scrollBarWidth - 1)) + windowX + 2
-      local scrollHandleChar = "▀"
-      
-      for i = windowX + 2, windowX + windowWidth - 3 do
-        gpu.set(i, windowY + windowHeight - 1, (i == scrollHandlePos) and scrollHandleChar or "─")
-      end
-    end
-    
-    gpu.setForeground(oldFg)
   end
 end
 
--- Handle scroll event
-local function handleScroll(direction, isHorizontal)
-  local scrollAmount = direction * config.scrollSpeed
+-- Draw scroll indicators
+local function drawScrollIndicators(x, y, width, canScrollUp, canScrollDown)
+  gpu.setForeground(config.borderColor)
   
-  if isHorizontal then
-    scrollX = math.max(0, math.min(scrollX + scrollAmount, maxScrollX))
-  else
-    scrollY = math.max(0, math.min(scrollY + scrollAmount, maxScrollY))
+  -- Draw up indicator if needed
+  if canScrollUp then
+    gpu.setForeground(config.titleColor)
+    gpu.set(x + width / 2 - 1, y, "▲")
   end
+  
+  -- Draw down indicator if needed
+  if canScrollDown then
+    gpu.setForeground(config.titleColor)
+    gpu.set(x + width / 2 - 1, y + 2, "▼")
+  end
+  
+  gpu.setForeground(config.defaultForeground)
 end
 
--- Draw the railway map within a window
+-- Draw the railway map within a window with scrolling support
 local function drawMap()
   local screenWidth, screenHeight = gpu.getResolution()
   local mapWidth = 0
@@ -323,50 +307,39 @@ local function drawMap()
   end
   
   local mapHeight = #config.railwayMap
-  local windowWidth = math.min(mapWidth + 8, screenWidth - 2) -- Extra padding for scrollbars
+  
+  -- Maximize screen usage while keeping borders
+  local windowWidth = math.min(mapWidth + 4, screenWidth)
   local windowHeight = math.min(mapHeight + 6, screenHeight - 4)
-  local windowX = math.floor((screenWidth - windowWidth) / 2)
+  local contentHeight = windowHeight - 6  -- Space for content after accounting for borders, title, and buttons
+  
+  -- Center the window
+  local windowX = math.max(1, math.floor((screenWidth - windowWidth) / 2))
   local windowY = 2
   
-  -- Update scroll limits
-  updateScrollLimits(mapWidth, mapHeight, windowWidth, windowHeight)
+  -- Calculate maximum scroll offset
+  maxScrollOffset = math.max(0, mapHeight - contentHeight)
+  scrollOffset = math.min(scrollOffset, maxScrollOffset) -- Ensure valid scroll
   
-  -- Draw scroll indicators
-  drawScrollIndicators(windowX, windowY, windowWidth, windowHeight)
-  
-  -- Calculate visible area
-  local viewWidth = windowWidth - 4
-  local viewHeight = windowHeight - 5
-  
-  -- Draw scrolling status if enabled
-  if maxScrollX > 0 or maxScrollY > 0 then
-    local scrollStatus = "Scroll: " .. scrollY .. "/" .. maxScrollY
-    if maxScrollX > 0 then
-      scrollStatus = scrollStatus .. " | H-Scroll: " .. scrollX .. "/" .. maxScrollX
-    end
-    
-    gpu.setForeground(config.borderColor)
-    local statusX = windowX + windowWidth - 2 - #scrollStatus
-    gpu.set(statusX, windowY, scrollStatus)
-  end
+  -- Draw the map window
+  drawWindow("RAILWAY NETWORK", windowWidth, windowHeight, windowX, windowY, 
+             config.defaultBackground, config.titleColor, config.borderColor)
   
   -- Draw railway map with scrolling
   gpu.setForeground(config.railColor)
-  for i = 1, math.min(viewHeight, mapHeight) do
-    local mapY = i + scrollY
-    if mapY <= mapHeight then
-      local line = config.railwayMap[mapY] or ""
-      local displayLine = line:sub(scrollX + 1, scrollX + viewWidth)
-      gpu.set(windowX + 2, windowY + 2 + i - 1, displayLine)
+  for i = 1, math.min(contentHeight, mapHeight) do
+    local mapIndex = i + scrollOffset
+    if mapIndex <= mapHeight then
+      local line = config.railwayMap[mapIndex]
+      if line then
+        gpu.set(windowX + 2, windowY + 2 + i, line)
+      end
     end
   end
   
-  -- Highlight stations that are visible in the current scroll view
+  -- Highlight stations that are visible in current scroll view
   for _, station in ipairs(config.stations) do
-    local visibleX = station.x - scrollX
-    local visibleY = station.y - scrollY
-    
-    if visibleX >= 0 and visibleX < viewWidth and visibleY >= 0 and visibleY < viewHeight then
+    if station.y >= scrollOffset + 1 and station.y <= scrollOffset + contentHeight then
       if config.useColorsIfAvailable then
         if station.isMain then
           gpu.setForeground(config.mainStationColor)
@@ -374,100 +347,155 @@ local function drawMap()
           gpu.setForeground(config.stationColor)
         end
       end
-      gpu.set(windowX + 2 + visibleX, windowY + 2 + visibleY, station.name)
+      gpu.set(windowX + 2 + station.x, windowY + 2 + (station.y - scrollOffset), station.name)
     end
   end
   
-  -- Draw legend at the bottom of the window if there's room
-  if windowHeight >= 10 then
-    local legendY = windowY + windowHeight - 3
-    gpu.setForeground(config.defaultForeground)
-    gpu.set(windowX + 2, legendY, "LEGEND:")
-    
-    if config.useColorsIfAvailable then
-      gpu.setForeground(config.mainStationColor)
-    end
-    gpu.set(windowX + 2, legendY + 1, "● Main Stations")
-    
-    if config.useColorsIfAvailable then
-      gpu.setForeground(config.stationColor)
-    end
-    gpu.set(windowX + 20, legendY + 1, "● Regular Stations")
-    
-    if config.useColorsIfAvailable then
-      gpu.setForeground(config.railColor)
-    end
-    gpu.set(windowX + 40, legendY + 1, "─── Railway Lines")
+  -- Draw scrollbar if needed
+  if mapHeight > contentHeight then
+    drawScrollbar(windowX + windowWidth - 2, windowY + 2, contentHeight, 
+                 mapHeight, contentHeight, scrollOffset)
+                 
+    -- Draw scroll indicators
+    drawScrollIndicators(windowX, windowY + contentHeight + 3, windowWidth, 
+                        scrollOffset > 0, scrollOffset < maxScrollOffset)
   end
   
-  -- Draw scrolling help
-  local helpY = windowY + 1
-  gpu.setForeground(config.borderColor)
-  gpu.set(windowX + 2, helpY, "Scroll: Mouse Wheel | Horizontal: Alt+Wheel")
+  -- Draw legend at the bottom
+  local legendY = windowY + windowHeight - 3
+  gpu.setForeground(config.defaultForeground)
+  gpu.set(windowX + 3, legendY, "LEGEND:")
   
-  -- Draw buttons
+  if config.useColorsIfAvailable then
+    gpu.setForeground(config.mainStationColor)
+  end
+  gpu.set(windowX + 12, legendY, "● Main Stations")
+  
+  if config.useColorsIfAvailable then
+    gpu.setForeground(config.stationColor)
+  end
+  gpu.set(windowX + 30, legendY, "● Regular Stations")
+  
+  if config.useColorsIfAvailable then
+    gpu.setForeground(config.railColor)
+  end
+  gpu.set(windowX + 50, legendY, "─── Railways")
+  
+  -- Draw buttons at the bottom
   gpu.setForeground(config.defaultForeground)
   local buttonY = screenHeight - 2
-  local buttonX = 5
+  local buttonSpacing = math.floor((screenWidth - 45) / 4)
+  local buttonX = buttonSpacing
   
-  local infoWidth = drawButton("Station Info [I]", buttonX, buttonY, config.titleColor, false)
-  buttonX = buttonX + infoWidth + 2
+  drawButton("Station Info [I]", buttonX, buttonY, config.titleColor, false)
+  buttonX = buttonX + buttonSpacing + 4
   
-  local refreshWidth = drawButton("Refresh [R]", buttonX, buttonY, config.stationColor, false)
-  buttonX = buttonX + refreshWidth + 2
+  drawButton("Scroll Up [↑]", buttonX, buttonY, config.stationColor, false)
+  buttonX = buttonX + buttonSpacing
   
-  local quitWidth = drawButton("Quit [Q]", buttonX, buttonY, 0xFF0000, false)
+  drawButton("Scroll Down [↓]", buttonX, buttonY, config.stationColor, false)
+  buttonX = buttonX + buttonSpacing + 4
   
-  return windowX, windowY, windowWidth, windowHeight
+  drawButton("Quit [Q]", buttonX, buttonY, 0xFF0000, false)
+  
+  return windowX, windowY, windowWidth, windowHeight, contentHeight
 end
 
--- Display station information
+-- Display station information with scrolling support
 local function showStationInfo()
   local screenWidth, screenHeight = gpu.getResolution()
   
-  -- Calculate window dimensions
-  local windowWidth = math.min(60, screenWidth - 4)
-  local windowHeight = math.min(#config.stations * 3 + 6, screenHeight - 4)
+  -- Calculate window dimensions to use more screen space
+  local windowWidth = math.min(70, screenWidth - 4)
+  local maxDisplayStations = math.floor((screenHeight - 10) / 3)
+  local stationsToShow = math.min(#config.stations, maxDisplayStations)
+  local windowHeight = stationsToShow * 3 + 6
+  
+  -- Center the window
   local windowX = math.floor((screenWidth - windowWidth) / 2)
   local windowY = math.floor((screenHeight - windowHeight) / 2)
   
-  -- Draw the station info window
-  drawWindow("STATION INFORMATION", windowWidth, windowHeight, windowX, windowY, 
-             config.defaultBackground, config.titleColor, config.borderColor)
+  -- Initialize station scrolling
+  local stationScrollOffset = 0
+  local maxStationScroll = math.max(0, #config.stations - maxDisplayStations)
+  local showingInfo = true
   
-  -- Draw station details
-  for i, station in ipairs(config.stations) do
-    local yPos = windowY + i * 3
+  while showingInfo do
+    -- Draw the station info window
+    drawWindow("STATION INFORMATION", windowWidth, windowHeight, windowX, windowY, 
+               config.defaultBackground, config.titleColor, config.borderColor)
     
-    if config.useColorsIfAvailable and station.isMain then
-      gpu.setForeground(config.mainStationColor)
-    elseif config.useColorsIfAvailable then
-      gpu.setForeground(config.stationColor)
+    -- Draw station details with scrolling
+    for i = 1, stationsToShow do
+      local stationIndex = i + stationScrollOffset
+      if stationIndex <= #config.stations then
+        local station = config.stations[stationIndex]
+        local yPos = windowY + 2 + (i - 1) * 3
+        
+        if config.useColorsIfAvailable and station.isMain then
+          gpu.setForeground(config.mainStationColor)
+        elseif config.useColorsIfAvailable then
+          gpu.setForeground(config.stationColor)
+        end
+        
+        gpu.set(windowX + 3, yPos, station.name .. ": " .. station.label)
+        gpu.setForeground(config.defaultForeground)
+        gpu.set(windowX + 5, yPos + 1, station.desc)
+      end
     end
     
-    gpu.set(windowX + 3, yPos, station.name .. ": " .. station.label)
-    gpu.setForeground(config.defaultForeground)
-    gpu.set(windowX + 5, yPos + 1, station.desc)
-  end
-  
-  -- Draw close button
-  local buttonText = "[ Close ]"
-  local buttonX = windowX + math.floor((windowWidth - #buttonText) / 2)
-  local buttonY = windowY + windowHeight - 2
-  gpu.setForeground(config.titleColor)
-  gpu.set(buttonX, buttonY, buttonText)
-  
-  -- Wait for key press or click
-  while true do
+    -- Draw scrollbar if needed
+    local contentHeight = stationsToShow * 3
+    if #config.stations > stationsToShow then
+      drawScrollbar(windowX + windowWidth - 2, windowY + 2, contentHeight, 
+                   #config.stations * 3, contentHeight, stationScrollOffset)
+    end
+    
+    -- Draw navigation buttons
+    local buttonY = windowY + windowHeight - 2
+    local buttonX = windowX + 5
+    
+    if stationScrollOffset > 0 then
+      drawButton("Up [↑]", buttonX, buttonY, config.stationColor, false)
+    end
+    buttonX = buttonX + 12
+    
+    if stationScrollOffset < maxStationScroll then
+      drawButton("Down [↓]", buttonX, buttonY, config.stationColor, false)
+    end
+    buttonX = buttonX + 12
+    
+    local closeButtonText = "[ Close ]"
+    local closeButtonX = windowX + windowWidth - 15
+    gpu.setForeground(config.titleColor)
+    gpu.set(closeButtonX, buttonY, closeButtonText)
+    
+    -- Wait for key press or click
     local eventData = {event.pull()}
     local eventType = eventData[1]
     
     if eventType == "key_down" then
-      break
+      local _, _, _, code = table.unpack(eventData)
+      
+      if code == keyboard.keys.enter or code == keyboard.keys.space or code == keyboard.keys.escape then
+        showingInfo = false
+      elseif code == keyboard.keys.up and stationScrollOffset > 0 then
+        stationScrollOffset = stationScrollOffset - 1
+      elseif code == keyboard.keys.down and stationScrollOffset < maxStationScroll then
+        stationScrollOffset = stationScrollOffset + 1
+      end
     elseif eventType == "touch" then
       local _, eX, eY = table.unpack(eventData)
-      if eX >= buttonX and eX < buttonX + #buttonText and eY == buttonY then
-        break
+      
+      -- Check close button
+      if eY == buttonY and eX >= closeButtonX and eX < closeButtonX + #closeButtonText then
+        showingInfo = false
+      -- Check up button
+      elseif eY == buttonY and eX >= windowX + 5 and eX < windowX + 17 and stationScrollOffset > 0 then
+        stationScrollOffset = stationScrollOffset - 1
+      -- Check down button
+      elseif eY == buttonY and eX >= windowX + 17 and eX < windowX + 29 and stationScrollOffset < maxStationScroll then
+        stationScrollOffset = stationScrollOffset + 1
       end
     end
   end
@@ -480,6 +508,7 @@ local function showStartupAnimation()
   local x = math.floor((screenWidth - #message) / 2)
   local y = math.floor(screenHeight / 2)
   
+  -- Fancy loading animation
   local animationIndex = 1
   for i = 1, 10 do
     local char = config.animationChars[animationIndex]
@@ -490,6 +519,96 @@ local function showStartupAnimation()
   
   gpu.set(x, y, message .. " ✓")
   os.sleep(0.5)
+  term.clear()
+end
+
+-- Process keyboard and mouse input for map view
+local function handleMapInput(eventData, screenWidth, contentHeight)
+  local eventType = eventData[1]
+  
+  if eventType == "key_down" then
+    local _, _, _, code = table.unpack(eventData)
+    
+    -- Q to quit
+    if code == keyboard.keys.q then
+      return "quit"
+    -- I for station info
+    elseif code == keyboard.keys.i then
+      return "info"
+    -- R to refresh/redraw
+    elseif code == keyboard.keys.r then
+      return "refresh"
+    -- Up arrow to scroll up
+    elseif code == keyboard.keys.up then
+      if scrollOffset > 0 then
+        scrollOffset = scrollOffset - 1
+      end
+      return "redraw"
+    -- Down arrow to scroll down
+    elseif code == keyboard.keys.down then
+      if scrollOffset < maxScrollOffset then
+        scrollOffset = scrollOffset + 1
+      end
+      return "redraw"
+    -- Page Up for faster scrolling
+    elseif code == keyboard.keys.pageUp then
+      scrollOffset = math.max(0, scrollOffset - contentHeight)
+      return "redraw"
+    -- Page Down for faster scrolling
+    elseif code == keyboard.keys.pageDown then
+      scrollOffset = math.min(maxScrollOffset, scrollOffset + contentHeight)
+      return "redraw"
+    -- Home key to go to top
+    elseif code == keyboard.keys.home then
+      scrollOffset = 0
+      return "redraw"
+    -- End key to go to bottom
+    elseif code == keyboard.keys["end"] then
+      scrollOffset = maxScrollOffset
+      return "redraw"
+    end
+  elseif eventType == "touch" then
+    local _, eX, eY = table.unpack(eventData)
+    local buttonY = screenHeight - 2
+    
+    -- Check if a button was clicked
+    if eY == buttonY then
+      local buttonSpacing = math.floor((screenWidth - 45) / 4)
+      local buttonX = buttonSpacing
+      
+      -- Station Info button
+      if isInButton(eX, eY, buttonX, buttonY, 17) then
+        return "info"
+      -- Scroll Up button
+      elseif isInButton(eX, eY, buttonX + buttonSpacing + 4, buttonY, 13) then
+        if scrollOffset > 0 then
+          scrollOffset = scrollOffset - 1
+        end
+        return "redraw"
+      -- Scroll Down button
+      elseif isInButton(eX, eY, buttonX + buttonSpacing * 2 + 4, buttonY, 15) then
+        if scrollOffset < maxScrollOffset then
+          scrollOffset = scrollOffset + 1
+        end
+        return "redraw"
+      -- Quit button
+      elseif isInButton(eX, eY, buttonX + buttonSpacing * 3 + 8, buttonY, 9) then
+        return "quit"
+      end
+    -- Check mouse wheel for scrolling
+    elseif eventType == "scroll" then
+      local _, _, _, direction = table.unpack(eventData)
+      if direction == 1 and scrollOffset > 0 then -- Scroll up
+        scrollOffset = scrollOffset - 1
+        return "redraw"
+      elseif direction == -1 and scrollOffset < maxScrollOffset then -- Scroll down
+        scrollOffset = scrollOffset + 1
+        return "redraw"
+      end
+    end
+  end
+  
+  return nil
 end
 
 -- Main program loop
@@ -508,60 +627,21 @@ local function main()
   local lastUpdateTime = 0
   
   while running do
-    local windowX, windowY, windowWidth, windowHeight = drawMap()
+    local windowX, windowY, windowWidth, windowHeight, contentHeight = drawMap()
     
     -- Wait for event with timeout for auto-refresh
     local remainingTime = config.updateInterval - (computer.uptime() - lastUpdateTime)
     remainingTime = math.max(0.1, remainingTime)
     
     local eventData = {event.pull(remainingTime)}
-    local eventType = eventData[1]
+    local action = handleMapInput(eventData, screenWidth, contentHeight)
     
-    if eventType == "key_down" then
-      local _, _, _, code, isAlt = table.unpack(eventData)
-      -- Q to quit
-      if code == keyboard.keys.q then
-        running = false
-      -- I for station info
-      elseif code == keyboard.keys.i then
-        showStationInfo()
-      -- R to refresh/redraw
-      elseif code == keyboard.keys.r then
-        lastUpdateTime = computer.uptime()
-      -- Arrow keys for scrolling
-      elseif code == keyboard.keys.up then
-        handleScroll(-1, false)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.down then
-        handleScroll(1, false)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.left then
-        handleScroll(-1, true)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.right then
-        handleScroll(1, true)
-        lastUpdateTime = computer.uptime()
-      end
-    elseif eventType == "touch" then
-      local _, eX, eY = table.unpack(eventData)
-      local buttonY = screenHeight - 2
-      
-      -- Check if a button was clicked
-      if eY == buttonY then
-        if isInButton(eX, eY, 5, buttonY, 18) then
-          -- Station Info button
-          showStationInfo()
-        elseif isInButton(eX, eY, 25, buttonY, 14) then
-          -- Refresh button
-          lastUpdateTime = computer.uptime()
-        elseif isInButton(eX, eY, 41, buttonY, 11) then
-          -- Quit button
-          running = false
-        end
-      end
-    elseif eventType == "scroll" then
-      local _, _, _, direction, isAlt = table.unpack(eventData)
-      handleScroll(direction, isAlt)
+    -- Process action
+    if action == "quit" then
+      running = false
+    elseif action == "info" then
+      showStationInfo()
+    elseif action == "refresh" then
       lastUpdateTime = computer.uptime()
     end
     
@@ -572,7 +652,7 @@ local function main()
     end
   end
   
-  -- Cleanup - just restore UI without showing exit message
+  -- Cleanup
   restoreUI()
 end
 
