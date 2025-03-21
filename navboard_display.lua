@@ -24,7 +24,6 @@ local config = {
   mainStationColor = 0xFF0000,  -- Red for main stations/hubs
   borderColor = 0x555555,       -- Border color
   useColorsIfAvailable = true,  -- Use colors if the GPU supports it
-  windowTitle = "Railway Network Display",
   animationChars = {"|", "/", "-", "\\"},
   
   -- Default railway map (will be overridden by config)
@@ -237,10 +236,6 @@ local function setupUI()
   gpu.setForeground(config.defaultForeground)
   term.clear()
   
-  -- Draw main window
-  drawWindow(config.windowTitle, screenWidth, screenHeight, 1, 1, 
-             config.defaultBackground, config.titleColor, config.borderColor)
-  
   return screenWidth, screenHeight
 end
 
@@ -269,7 +264,7 @@ local function drawMap()
   local windowY = 2
   
   -- Draw the map window
-  drawWindow("RAILWAY MAP", windowWidth, windowHeight, windowX, windowY, 
+  drawWindow("MAP", windowWidth, windowHeight, windowX, windowY, 
              config.defaultBackground, config.titleColor, config.borderColor)
   
   -- Draw railway map
@@ -463,7 +458,6 @@ local function main()
   
   -- Cleanup
   restoreUI()
-  messageBox("Goodbye", "Railway display closed", "success")
 end
 
 -- Error handling for the entire program
