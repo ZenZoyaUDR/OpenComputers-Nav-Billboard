@@ -332,20 +332,20 @@ local function drawScrollIndicators(windowX, windowY, viewWidth, viewHeight, map
   gpu.setForeground(oldFg)
 end
 
--- Handle scroll event with improved physics
 local function handleScroll(direction, isHorizontal)
-  local scrollAmount = direction * config.scrollSpeed
-  
-  if isHorizontal then
-    local targetX = scrollX + scrollAmount
-    -- Add smooth scrolling effect
-    scrollX = math.max(0, math.min(targetX, maxScrollX))
-  else
-    local targetY = scrollY + scrollAmount
-    -- Add smooth scrolling effect
-    scrollY = math.max(0, math.min(targetY, maxScrollY))
+    local scrollAmount = direction * config.scrollSpeed
+    
+    if isHorizontal then
+      -- Fix: Ensure scrollX can go in both directions
+      local targetX = scrollX + scrollAmount
+      -- Clamp to valid range
+      scrollX = math.max(0, math.min(targetX, maxScrollX))
+    else
+      local targetY = scrollY + scrollAmount
+      -- Clamp to valid range
+      scrollY = math.max(0, math.min(targetY, maxScrollY))
+    end
   end
-end
 
 -- Check if a point is within the scrollbar
 local function isInScrollbar(x, y, windowX, windowY, viewWidth, viewHeight, isVertical)
@@ -597,30 +597,31 @@ local function main()
     local eventData = {event.pull(remainingTime)}
     local eventType = eventData[1]
     
-    if eventType == "key_down" then
-      local _, _, _, code, isAlt = table.unpack(eventData)
-      -- Q to quit
-      if code == keyboard.keys.q then
-        running = false
-      -- I for station info
-      elseif code == keyboard.keys.i then
-        showStationInfo()
-      -- R to refresh/redraw
-      elseif code == keyboard.keys.r then
-        lastUpdateTime = computer.uptime()
-      -- Arrow keys for scrolling
-      elseif code == keyboard.keys.up then
-        handleScroll(-1, false)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.down then
-        handleScroll(1, false)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.left then
-        handleScroll(-1, true)
-        lastUpdateTime = computer.uptime()
-      elseif code == keyboard.keys.right then
-        handleScroll(1, true)
-        lastUpdateTime = computer.uptime()
+  
+  elseif eventType == "key_down" then
+    local _, _, _, code, isAlt = table.unpack(eventData)
+    -- Q to quit
+    if code == keyboard.keys.q then
+      running = false
+    -- I for station info
+    elseif code == keyboard.keys.i then
+      showStationInfo()
+    -- R to refresh/redraw
+    elseif code == keyboard.keys.r then
+      lastUpdateTime = computer.uptime()
+    -- Arrow keys for scrolling
+    elseif code == keyboard.keys.up then
+      handleScroll(-1, false) -- Negative direction for up
+      lastUpdateTime = computer.uptime()
+    elseif code == keyboard.keys.down then
+      handleScroll(1, false) -- Positive direction for down
+      lastUpdateTime = computer.uptime()
+    elseif code == keyboard.keys.left then
+      handleScroll(-1, true) -- Negative direction for left
+      lastUpdateTime = computer.uptime()
+    elseif code == keyboard.keys.right then
+      handleScroll(1, true) -- Positive direction for right
+      lastUpdateTime = computer.uptime()
       -- Page Up/Down for faster scrolling
       elseif code == keyboard.keys.pageUp then
         handleScroll(-math.floor(viewHeight / 2), false)
