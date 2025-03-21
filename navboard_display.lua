@@ -13,8 +13,6 @@ local filesystem = require("filesystem")
 -- Default configuration (will be overridden by config file if it exists)
 local config = {
   updateInterval = 10,          -- Update interval in seconds
-  screenWidth = 80,             -- Default screen width
-  screenHeight = 30,            -- Default screen height
   defaultBackground = 0x000000, -- Black background
   defaultForeground = 0xFFFFFF, -- White text
   titleColor = 0x0088FF,        -- Blue for title
@@ -22,6 +20,7 @@ local config = {
   pathColor = 0x808080,         -- Gray for paths lines
   mainHubColor = 0xFF0000,      -- Red for main hubs
   borderColor = 0x555555,       -- Border color
+  legendBackgroundColor = 0x222222, -- Darker background for legend
   useColorsIfAvailable = true,  -- Use colors if the GPU supports it
   windowTitle = "Railway Network Display",
   animationChars = {"|", "/", "-", "\\"},
@@ -36,7 +35,11 @@ local config = {
   -- Default stations (will be overridden by config)
   stations = {
     { name = "A", label = "EXAMPLE STATION", desc = "Example station description", x = 10, y = 5, isMain = true }
-  }
+  },
+  
+  -- Font scaling for better visibility
+  stationFontScale = 1.5,      -- Scale station labels for better visibility
+  legendFontScale = 1.2,       -- Scale legend text for better visibility
 }
 
 -- Store original screen settings to restore later
@@ -179,19 +182,27 @@ local function messageBox(title, message, type)
   gpu.setForeground(oldFg)
 end
 
--- Function to create a button
+-- Function to create a sleek, modern button
 local function drawButton(text, x, y, color, isSelected)
-  local oldFg = gpu.getForeground()
+  local oldBg, oldFg = gpu.getBackground(), gpu.getForeground()
   local buttonWidth = #text + 4
   
   if isSelected then
-    gpu.setForeground(0xFFFFFF)
-    gpu.set(x, y, "[ " .. text .. " ]")
+    -- Selected button - highlight with background
+    gpu.setBackground(color)
+    gpu.setForeground(0x000000)
+    gpu.fill(x, y, buttonWidth, 1, " ")
+    gpu.set(x + 2, y, text)
   else
+    -- Normal button - clean modern style
+    gpu.setBackground(config.defaultBackground)
     gpu.setForeground(color)
-    gpu.set(x, y, "  " .. text .. "  ")
+    gpu.set(x + 2, y, text)
+    -- Draw subtle underline
+    gpu.fill(x + 1, y + 1, #text + 2, 1, "▁")
   end
   
+  gpu.setBackground(oldBg)
   gpu.setForeground(oldFg)
   return buttonWidth
 end
@@ -218,29 +229,27 @@ local function loadConfig()
   end
 end
 
--- Function to setup the UI
+-- Function to setup the UI with maximum resolution
 local function setupUI()
   -- Store original settings
   originalBackground = gpu.getBackground()
   originalForeground = gpu.getForeground()
   originalWidth, originalHeight = gpu.getResolution()
   
-  -- Set new resolution if needed
+  -- Set to maximum available resolution
   local maxWidth, maxHeight = gpu.maxResolution()
-  local screenWidth = math.min(maxWidth, config.screenWidth)
-  local screenHeight = math.min(maxHeight, config.screenHeight)
-  gpu.setResolution(screenWidth, screenHeight)
+  gpu.setResolution(maxWidth, maxHeight)
   
   -- Clear screen with new colors
   gpu.setBackground(config.defaultBackground)
   gpu.setForeground(config.defaultForeground)
   term.clear()
   
-  -- Draw main window - full screen for maximum space efficiency
-  drawWindow(config.windowTitle, screenWidth, screenHeight, 1, 1, 
+  -- Draw main window - full screen
+  drawWindow(config.windowTitle, maxWidth, maxHeight, 1, 1, 
              config.defaultBackground, config.titleColor, config.borderColor)
   
-  return screenWidth, screenHeight
+  return maxWidth, maxHeight
 end
 
 -- Function to restore original UI settings
@@ -251,7 +260,24 @@ local function restoreUI()
   term.clear()
 end
 
--- Draw the railway map within a window - redesigned to show full map without scrolling
+-- Function to draw a bold character for better visibility
+local function drawBoldChar(x, y, char, color)
+  local oldFg = gpu.getForeground()
+  gpu.setForeground(color)
+  
+  -- Draw the character
+  gpu.set(x, y, char)
+  
+  -- For better visibility from afar, draw the same character with slight offsets
+  -- This creates a "bold" effect that's more visible
+  if config.stationFontScale > 1 then
+    gpu.set(x + 1, y, char)
+  end
+  
+  gpu.setForeground(oldFg)
+end
+
+-- Draw the railway map using maximum screen real estate
 local function drawMap()
   local screenWidth, screenHeight = gpu.getResolution()
   
@@ -264,13 +290,13 @@ local function drawMap()
   
   -- Maximum available space for the map view (accounting for borders and controls)
   local maxAvailableWidth = screenWidth - 4  -- 2 for borders, 2 for padding
-  local maxAvailableHeight = screenHeight - 7 -- Account for title, borders, legend, buttons, etc.
+  local maxAvailableHeight = screenHeight - 6 -- Account for title, borders, legend, buttons
   
   -- Window dimensions - maximize space usage
   local viewWidth = math.min(mapWidth, maxAvailableWidth)
   local viewHeight = math.min(mapHeight, maxAvailableHeight)
   
-  -- Center the window
+  -- Center the map
   local windowWidth = viewWidth + 4  -- Add space for borders
   local windowHeight = viewHeight + 6 -- Add space for title, borders, and status
   local windowX = math.max(1, math.floor((screenWidth - windowWidth) / 2))
@@ -281,7 +307,7 @@ local function drawMap()
   drawWindow("Railway Network Map", screenWidth, screenHeight, 1, 1, 
              config.defaultBackground, config.titleColor, config.borderColor)
   
-  -- Draw railway map - centered
+  -- Draw railway map - with better contrast for visibility
   gpu.setForeground(config.railColor or config.pathColor)
   for i = 1, viewHeight do
     if i <= mapHeight then
@@ -296,94 +322,126 @@ local function drawMap()
     end
   end
   
-  -- Highlight stations that are visible in the current view
+  -- Highlight stations with enhanced visibility
   for _, station in ipairs(config.stations) do
     if station.x >= 0 and station.x < viewWidth and station.y >= 0 and station.y < viewHeight then
-      if config.useColorsIfAvailable then
-        if station.isMain then
-          gpu.setForeground(config.mainStationColor or config.mainHubColor)
-        else
-          gpu.setForeground(config.stationColor or config.hubColor)
-        end
+      local color
+      if station.isMain then
+        color = config.mainStationColor or config.mainHubColor
+      else
+        color = config.stationColor or config.hubColor
       end
-      gpu.set(windowX + 2 + station.x, windowY + 1 + station.y, station.name)
+      
+      -- Draw station name with bold effect for better visibility
+      drawBoldChar(windowX + 2 + station.x, windowY + 1 + station.y, station.name, color)
     end
   end
   
-  -- Draw legend at the bottom of the window
-  local legendY = screenHeight - 5
+  -- Draw sleek modern legend panel at the bottom
+  local legendHeight = 3
+  local legendY = screenHeight - legendHeight - 2
+  
+  -- Draw legend background panel
+  gpu.setBackground(config.legendBackgroundColor)
+  gpu.fill(3, legendY, screenWidth - 4, legendHeight, " ")
+  
+  -- Draw legend title
+  gpu.setForeground(config.titleColor)
+  gpu.set(5, legendY, "« LEGEND »")
+  
+  -- Draw legend items - more compact and modern layout
+  local itemX = 20
+  
+  -- Main stations legend
+  gpu.setForeground(config.mainStationColor or config.mainHubColor)
+  gpu.set(itemX, legendY, "●")
   gpu.setForeground(config.defaultForeground)
-  gpu.set(windowX + 2, legendY, "LEGEND:")
+  gpu.set(itemX + 2, legendY, "Main Stations")
   
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.mainStationColor or config.mainHubColor)
-  end
-  gpu.set(windowX + 10, legendY, "● Main Stations")
-  
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.stationColor or config.hubColor)
-  end
-  gpu.set(windowX + 30, legendY, "● Regular Stations")
-  
-  if config.useColorsIfAvailable then
-    gpu.setForeground(config.railColor or config.pathColor)
-  end
-  gpu.set(windowX + 50, legendY, "─── Railway Lines")
-  
-  -- Draw buttons in a centered row
+  -- Regular stations legend
+  itemX = itemX + 20
+  gpu.setForeground(config.stationColor or config.hubColor)
+  gpu.set(itemX, legendY, "●")
   gpu.setForeground(config.defaultForeground)
-  local buttonY = screenHeight - 2
+  gpu.set(itemX + 2, legendY, "Regular Stations")
+  
+  -- Railway lines legend
+  itemX = itemX + 20
+  gpu.setForeground(config.railColor or config.pathColor)
+  gpu.set(itemX, legendY, "───")
+  gpu.setForeground(config.defaultForeground)
+  gpu.set(itemX + 4, legendY, "Railway Lines")
+  
+  -- Reset background color
+  gpu.setBackground(config.defaultBackground)
+  
+  -- Draw buttons in a centered row with modern styling
+  local buttonY = screenHeight - 3
   
   -- Calculate total width of all buttons to center them
-  local totalButtonWidth = 18 + 2 + 14 + 2 + 11  -- Width of all buttons plus spacing
+  local totalButtonWidth = 18 + 6 + 14 + 6 + 11  -- Width of all buttons plus spacing
   local buttonX = math.floor((screenWidth - totalButtonWidth) / 2)
   
   local infoWidth = drawButton("Station Info [I]", buttonX, buttonY, config.titleColor, false)
-  buttonX = buttonX + infoWidth + 2
+  buttonX = buttonX + infoWidth + 6
   
   local refreshWidth = drawButton("Refresh [R]", buttonX, buttonY, config.stationColor or config.hubColor, false)
-  buttonX = buttonX + refreshWidth + 2
+  buttonX = buttonX + refreshWidth + 6
   
   local quitWidth = drawButton("Quit [Q]", buttonX, buttonY, 0xFF0000, false)
+  
+  -- Draw current status
+  local timeStr = os.date("%H:%M:%S")
+  gpu.setForeground(config.defaultForeground)
+  gpu.set(screenWidth - #timeStr - 4, screenHeight - 2, timeStr)
   
   return windowX, windowY, viewWidth, viewHeight
 end
 
--- Display station information
+-- Display station information with enhanced readability
 local function showStationInfo()
   local screenWidth, screenHeight = gpu.getResolution()
   
   -- Calculate window dimensions
-  local windowWidth = math.min(60, screenWidth - 4)
+  local windowWidth = math.min(math.floor(screenWidth * 0.8), screenWidth - 4)
   local windowHeight = math.min(#config.stations * 3 + 6, screenHeight - 4)
   local windowX = math.floor((screenWidth - windowWidth) / 2)
   local windowY = math.floor((screenHeight - windowHeight) / 2)
   
-  -- Draw the station info window
+  -- Draw the station info window with enhanced styling
   drawWindow("STATION INFORMATION", windowWidth, windowHeight, windowX, windowY, 
              config.defaultBackground, config.titleColor, config.borderColor)
   
-  -- Draw station details
+  -- Draw station details with improved visibility
   for i, station in ipairs(config.stations) do
     local yPos = windowY + i * 3
     
-    if config.useColorsIfAvailable and station.isMain then
-      gpu.setForeground(config.mainStationColor or config.mainHubColor)
-    elseif config.useColorsIfAvailable then
-      gpu.setForeground(config.stationColor or config.hubColor)
+    -- Highlight station name based on type
+    local color
+    if station.isMain then
+      color = config.mainStationColor or config.mainHubColor
+    else
+      color = config.stationColor or config.hubColor
     end
     
-    gpu.set(windowX + 3, yPos, station.name .. ": " .. station.label)
+    -- Draw station name with enhanced visibility
+    gpu.setForeground(color)
+    gpu.set(windowX + 3, yPos, station.name .. ":")
+    
+    -- Draw station label with slight offset for visual separation
+    gpu.setForeground(config.defaultForeground)
+    gpu.set(windowX + 6, yPos, station.label)
+    
+    -- Draw station description with slight indent
     gpu.setForeground(config.defaultForeground)
     gpu.set(windowX + 5, yPos + 1, station.desc)
   end
   
-  -- Draw close button
-  local buttonText = "[ Close ]"
-  local buttonX = windowX + math.floor((windowWidth - #buttonText) / 2)
+  -- Draw sleek close button
+  local buttonText = "Close"
+  local buttonX = windowX + math.floor((windowWidth - #buttonText - 4) / 2)
   local buttonY = windowY + windowHeight - 2
-  gpu.setForeground(config.titleColor)
-  gpu.set(buttonX, buttonY, buttonText)
+  drawButton(buttonText, buttonX, buttonY, config.titleColor, false)
   
   -- Wait for key press or click
   while true do
@@ -394,7 +452,7 @@ local function showStationInfo()
       break
     elseif eventType == "touch" then
       local _, eX, eY = table.unpack(eventData)
-      if eX >= buttonX and eX < buttonX + #buttonText and eY == buttonY then
+      if eX >= buttonX and eX < buttonX + #buttonText + 4 and eY == buttonY then
         break
       end
     end
@@ -408,14 +466,29 @@ local function showStartupAnimation()
   local x = math.floor((screenWidth - #message) / 2)
   local y = math.floor(screenHeight / 2)
   
-  local animationIndex = 1
-  for i = 1, 10 do
-    local char = config.animationChars[animationIndex]
-    gpu.set(x, y, message .. " " .. char)
-    os.sleep(0.1)
-    animationIndex = animationIndex % #config.animationChars + 1
+  -- Progressive loading animation
+  gpu.setForeground(config.titleColor)
+  gpu.set(x, y, message)
+  
+  -- Draw loading bar
+  local barWidth = 30
+  local barX = math.floor((screenWidth - barWidth) / 2)
+  local barY = y + 2
+  
+  -- Draw bar outline
+  gpu.setForeground(config.borderColor)
+  gpu.set(barX, barY, "┌" .. string.rep("─", barWidth) .. "┐")
+  gpu.set(barX, barY + 1, "│" .. string.rep(" ", barWidth) .. "│")
+  gpu.set(barX, barY + 2, "└" .. string.rep("─", barWidth) .. "┘")
+  
+  -- Animate loading bar
+  gpu.setForeground(config.titleColor)
+  for i = 1, barWidth do
+    gpu.set(barX + i, barY + 1, "█")
+    os.sleep(0.05)
   end
   
+  -- Show completion message
   gpu.set(x, y, message .. " ✓")
   os.sleep(0.5)
 end
@@ -459,21 +532,21 @@ local function main()
       end
     elseif eventType == "touch" then
       local _, eX, eY = table.unpack(eventData)
-      local buttonY = screenHeight - 2
+      local buttonY = screenHeight - 3
       
       -- Check if a button was clicked
       if eY == buttonY then
         -- Calculate button positions same as in drawMap
-        local totalButtonWidth = 18 + 2 + 14 + 2 + 11
+        local totalButtonWidth = 18 + 6 + 14 + 6 + 11
         local buttonX = math.floor((screenWidth - totalButtonWidth) / 2)
         
         if isInButton(eX, eY, buttonX, buttonY, 18) then
           -- Station Info button
           showStationInfo()
-        elseif isInButton(eX, eY, buttonX + 18 + 2, buttonY, 14) then
+        elseif isInButton(eX, eY, buttonX + 18 + 6, buttonY, 14) then
           -- Refresh button
           lastUpdateTime = computer.uptime()
-        elseif isInButton(eX, eY, buttonX + 18 + 2 + 14 + 2, buttonY, 11) then
+        elseif isInButton(eX, eY, buttonX + 18 + 6 + 14 + 6, buttonY, 11) then
           -- Quit button
           running = false
         end
@@ -487,7 +560,7 @@ local function main()
     end
   end
   
-  -- Cleanup - just restore UI without showing exit message
+  -- Cleanup
   restoreUI()
 end
 
