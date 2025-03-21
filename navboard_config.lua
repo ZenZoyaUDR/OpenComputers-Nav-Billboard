@@ -1,6 +1,6 @@
 -- Navigation Billboard Configuration File
 
-{
+return {
     -- Title settings
     title = "NETHER HUB",
     
@@ -36,4 +36,4 @@
       {name = "End Portal", direction = "↗", distance = 320},
       {name = "Witch Farm", direction = "↙", distance = 275},
     }
-  }
+}
