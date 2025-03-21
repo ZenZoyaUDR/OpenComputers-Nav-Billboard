@@ -7,6 +7,7 @@ local event = require("event")
 local term = require("term")
 local os = require("os")
 local filesystem = require("filesystem")
+local serialization = require("serialization")
 
 -- Local configuration file path
 local configPath = "/home/navboard_config.lua"
@@ -53,8 +54,8 @@ local function loadConfig()
   local file = filesystem.open(configPath, "r")
   local content = file:read("*all")
   file:close()
-  local success, loadedConfig = pcall(function() return load("return " .. content)() end)
-  if success and type(loadedConfig) == "table" then
+  local loadedConfig = serialization.unserialize(content)
+  if type(loadedConfig) == "table" then
     config = loadedConfig
   end
 end
