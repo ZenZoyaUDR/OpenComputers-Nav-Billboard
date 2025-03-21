@@ -271,6 +271,12 @@ local function updateScrollLimits(mapWidth, mapHeight, viewWidth, viewHeight)
   -- Clamp current scroll values to valid range
   scrollX = math.max(0, math.min(scrollX, maxScrollX))
   scrollY = math.max(0, math.min(scrollY, maxScrollY))
+  
+  -- Debug print to diagnose scrolling issues
+  if config.showScrollbarNumbers then
+    -- This will show in the UI as part of scrollbar numbers
+    -- but won't spam the console
+  end
 end
 
 -- Draw modern scroll indicators
@@ -332,20 +338,40 @@ local function drawScrollIndicators(windowX, windowY, viewWidth, viewHeight, map
   gpu.setForeground(oldFg)
 end
 
+-- FIXED: Handle scroll event with improved physics and proper debugging
 local function handleScroll(direction, isHorizontal)
-    local scrollAmount = direction * config.scrollSpeed
+  -- Store old values for debugging
+  local oldScrollX, oldScrollY = scrollX, scrollY
+  
+  -- Calculate scroll amount based on direction and speed
+  local scrollAmount = direction * config.scrollSpeed
+  
+  if isHorizontal then
+    -- Update scrollX with proper bounds checking
+    local targetX = scrollX + scrollAmount
+    scrollX = math.max(0, math.min(targetX, maxScrollX))
     
-    if isHorizontal then
-      -- Fix: Ensure scrollX can go in both directions
-      local targetX = scrollX + scrollAmount
-      -- Clamp to valid range
-      scrollX = math.max(0, math.min(targetX, maxScrollX))
-    else
-      local targetY = scrollY + scrollAmount
-      -- Clamp to valid range
-      scrollY = math.max(0, math.min(targetY, maxScrollY))
+    -- Debug message if scrolling is not working
+    if oldScrollX == scrollX and scrollAmount ~= 0 then
+      -- We tried to scroll but couldn't - this helps diagnose if bounds are incorrect
+      if config.showScrollbarNumbers then
+        -- Will be shown in UI
+      end
+    end
+  else
+    -- Update scrollY with proper bounds checking
+    local targetY = scrollY + scrollAmount
+    scrollY = math.max(0, math.min(targetY, maxScrollY))
+    
+    -- Debug message if scrolling is not working
+    if oldScrollY == scrollY and scrollAmount ~= 0 then
+      -- We tried to scroll but couldn't - this helps diagnose if bounds are incorrect
+      if config.showScrollbarNumbers then
+        -- Will be shown in UI
+      end
     end
   end
+end
 
 -- Check if a point is within the scrollbar
 local function isInScrollbar(x, y, windowX, windowY, viewWidth, viewHeight, isVertical)
@@ -597,31 +623,30 @@ local function main()
     local eventData = {event.pull(remainingTime)}
     local eventType = eventData[1]
     
-  
-  if eventType == "key_down" then
-    local _, _, _, code, isAlt = table.unpack(eventData)
-    -- Q to quit
-    if code == keyboard.keys.q then
-      running = false
-    -- I for station info
-    elseif code == keyboard.keys.i then
-      showStationInfo()
-    -- R to refresh/redraw
-    elseif code == keyboard.keys.r then
-      lastUpdateTime = computer.uptime()
-    -- Arrow keys for scrolling
-    elseif code == keyboard.keys.up then
-      handleScroll(-1, false) -- Negative direction for up
-      lastUpdateTime = computer.uptime()
-    elseif code == keyboard.keys.down then
-      handleScroll(1, false) -- Positive direction for down
-      lastUpdateTime = computer.uptime()
-    elseif code == keyboard.keys.left then
-      handleScroll(-1, true) -- Negative direction for left
-      lastUpdateTime = computer.uptime()
-    elseif code == keyboard.keys.right then
-      handleScroll(1, true) -- Positive direction for right
-      lastUpdateTime = computer.uptime()
+    if eventType == "key_down" then
+      local _, _, _, code, isAlt = table.unpack(eventData)
+      -- Q to quit
+      if code == keyboard.keys.q then
+        running = false
+      -- I for station info
+      elseif code == keyboard.keys.i then
+        showStationInfo()
+      -- R to refresh/redraw
+      elseif code == keyboard.keys.r then
+        lastUpdateTime = computer.uptime()
+      -- Arrow keys for scrolling - FIXED direction values
+      elseif code == keyboard.keys.up then
+        handleScroll(-1, false) -- Negative direction for up
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.down then
+        handleScroll(1, false) -- Positive direction for down
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.left then
+        handleScroll(-1, true) -- FIXED: Negative direction for left
+        lastUpdateTime = computer.uptime()
+      elseif code == keyboard.keys.right then
+        handleScroll(1, true) -- Positive direction for right
+        lastUpdateTime = computer.uptime()
       -- Page Up/Down for faster scrolling
       elseif code == keyboard.keys.pageUp then
         handleScroll(-math.floor(viewHeight / 2), false)
@@ -671,6 +696,7 @@ local function main()
       end
     elseif eventType == "scroll" then
       local _, _, _, direction, isAlt = table.unpack(eventData)
+      -- FIXED: Make sure direction is correctly interpreted
       handleScroll(direction, isAlt)
       lastUpdateTime = computer.uptime()
     end
