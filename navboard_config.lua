@@ -20,7 +20,6 @@ return {
   
   -- Railway map
   railwayMap = {
-    "                                    MAP                                          ",
     "                                                                                 ",
     "                                             Zenkku                              ",
     "                                    [B]+-----BASE                                ",
@@ -29,20 +28,17 @@ return {
     "                                     |                                           ",
     "                                     |                                           ",
     "                                     |                                           ",
-    "         MINES                       |              Khy's                        ",
+    "         MINES                       |                Khy's                      ",
     "           |                         |       +--------BASE                       ",
     "           |                         |------[B]                                  ",
     "           +                         |                                           ",
     "          [M]-----------------------[A]+-----MAIN HUB                            ",
     "                                   / | \\                                        ",
-    "                    END           /  |  \\        Opt & Amy                      ",
+    "                    END           /  |  \\         Opt & Amy                     ",
     "                    PORTAL----+[A]   |   [B]+-----BASE                           ",
     "                                     |                                           ",
     "                                 [F]-|-[B]       hhhzzzsss'                      ",
     "                  GOLD FARM-------+     +--------BASE                            ",
-    "                                                                                 ",
-    "                                                                                 ",
-    "                                                                                 ",
     "                                                                                 ",
   },
   
@@ -52,15 +48,15 @@ return {
       name = "A", 
       label = "MAIN STATION",
       desc = "Central hub connecting all major railway lines",
-      x = 39, 
-      y = 13, 
+      x = 38, 
+      y = 14, 
       isMain = true 
     },
     { 
       name = "B", 
       label = "ZENKKU BASE",
       desc = "Connection to Zenkku's Base",
-      x = 22, 
+      x = 28, 
       y = 3, 
       isMain = false 
     },
