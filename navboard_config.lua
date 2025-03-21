@@ -22,9 +22,9 @@
   pageInfoColor = 0xAAAAAA,    -- Light gray
   
   -- Display settings
-  borderWidth = 3,             -- Width of the rainbow border
+  borderWidth = 1,             -- Width of the rainbow border
   frameDelay = 0.1,            -- Seconds between animation frames
-  slideshowDelay = 5,          -- Seconds between slideshow pages
+  slideshowDelay = 1000,          -- Seconds between slideshow pages
   locationsPerPage = 1,        -- Number of locations to show per page
   
   -- List of nether hub destinations
