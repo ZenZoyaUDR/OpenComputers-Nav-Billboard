@@ -72,8 +72,8 @@ return {
       name = "M", 
       label = "MINES",
       desc = "Access to the mining areas",
-      x = 12, 
-      y = 12, 
+      x = 11, 
+      y = 13, 
       isMain = false 
     },
     { 
